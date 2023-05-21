@@ -41,13 +41,11 @@ print(f'ave loss {ave_loss.item()}')
 
 @pytest.fixture(name="models", scope="module")
 def fixture_models():
-    model_path = 'gpt2-xl'
-    device = 'cpu'
+    model_path, device = 'gpt2-xl', 'cpu'
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     model = AutoModelForCausalLM.from_pretrained(model_path)
-    model.to(device)
-    model.eval();
+    model.to(device); model.eval()
 
     return (model, tokenizer)
 
