@@ -9,13 +9,11 @@ import torch.nn as nn
 
 # %%
 
-# TODO: Remove probably
 def tokenize(tokenizer, prompt: List[str], prepend_bos=True, device='cpu'):
     "Helper function to prepend <BOS>, tokenize, and move to device."
-    # Prepending BOS to GPT2 is fine even though it wasn't trained with it
+    # Prepending BOS to GPT2 is fine even though it wasn't trained with it is fine and intentional
     # https://github.com/neelnanda-io/TransformerLens/issues/282#issuecomment-1555972480
-    if type(prompt) == str:
-        prompt = [prompt]
+    assert isinstance(prompt, list), "Prompt must be a List[str]"
     if prepend_bos:
         prompt = [tokenizer.bos_token + p for p in prompt]
 

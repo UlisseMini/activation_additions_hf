@@ -39,7 +39,6 @@ print(f'ave loss {ave_loss.item()}')
 
 # %%
 
-# gpt2 fixture
 @pytest.fixture(name="models", scope="module")
 def fixture_models():
     model_path = 'gpt2-xl'
