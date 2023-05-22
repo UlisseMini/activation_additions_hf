@@ -1,6 +1,5 @@
 # %%
 
-from transformers import AutoTokenizer
 from contextlib import contextmanager
 from typing import Tuple, List, Callable, Optional
 import torch as t
@@ -77,14 +76,14 @@ def residual_stream(model: nn.Module, layers: Optional[List[int]] = None):
         yield stream
 
 
-def pad(tokenizer: AutoTokenizer, prompts: List[str], pad_token: str = ' '):
+def pad(tokenizer, prompts: List[str], pad_token: str = ' '):
     "Pad prompts with spaces at the end to have the same number of tokens"
     assert len(tokenizer.tokenize(pad_token)) == 1, "Padding token must be a single token"
     max_len = max(len(tokenizer.tokenize(p)) for p in prompts)
     return [p + pad_token * (max_len - len(tokenizer.tokenize(p))) for p in prompts]
 
 
-def get_diff_vector(model: nn.Module, tokenizer: AutoTokenizer, prompt_add: str, prompt_sub: str, layer: int):
+def get_diff_vector(model: nn.Module, tokenizer, prompt_add: str, prompt_sub: str, layer: int):
     """
     Get the difference vector between the activations of prompt_add and prompt_sub at the specified layer. 
     """
