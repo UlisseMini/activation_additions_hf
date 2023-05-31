@@ -63,7 +63,7 @@ def get_blocks(model: nn.Module) -> nn.ModuleList:
 
 
 @contextmanager
-def residual_stream(model: nn.Module, layers: Optional[List[int]] = None):
+def residual_stream(model: nn.Module, layers: Optional[List[int]] = None) -> List[t.Tensor]:
     """
     Context manager to store residual stream activations in the model at the specified layers.
     Alternatively "model(..., output_hidden_states=True)" can be used, this is more flexible though and works with model.generate().
@@ -87,14 +87,25 @@ def _device(model):
     return next(model.parameters()).device
 
 
+def get_vectors(model: nn.Module, tokenizer, prompts: List[str], layer: int):
+    """
+    Get the activations of the prompts at the specified layer. Used later for activation additions.
+    """
+    with residual_stream(model, layers=[layer]) as stream:
+        _ = model(**tokenize(tokenizer, prompts, device=_device(model)))
+
+    return stream[layer]
+
+
 def get_diff_vector(model: nn.Module, tokenizer, prompt_add: str, prompt_sub: str, layer: int):
     """
     Get the difference vector between the activations of prompt_add and prompt_sub at the specified layer. 
+    Convinience function for
+        s = get_vectors(..., prompts)
+        return s[0] - s[1]
     """
-    with residual_stream(model, layers=[layer]) as stream:
-        _ = model(**tokenize(tokenizer, [prompt_add, prompt_sub], device=_device(model)))
-
-    return (stream[layer][0] - stream[layer][1]).unsqueeze(0)
+    stream = get_vectors(model, tokenizer, [prompt_add, prompt_sub], layer)
+    return (stream[0] - stream[1]).unsqueeze(0)
 
 
 def get_hook_fn(act_diff: t.Tensor) -> PreHookFn:
