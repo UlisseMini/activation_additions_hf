@@ -108,9 +108,9 @@ def get_diff_vector(model: nn.Module, tokenizer, prompt_add: str, prompt_sub: st
     return (stream[0] - stream[1]).unsqueeze(0)
 
 
-def get_hook_fn(act_diff: t.Tensor) -> PreHookFn:
+def get_hook_fn(act_add: t.Tensor) -> PreHookFn:
     """
-    Get a hook function that adds the difference vector to the activations passed to it. For coeff != 1, multiply the difference vector by coeff before adding.
+    Get a hook function that adds an activation addition vector.
     """
 
     def _hook(_: nn.Module, inputs: Tuple[t.Tensor]):
@@ -119,11 +119,11 @@ def get_hook_fn(act_diff: t.Tensor) -> PreHookFn:
             return None # caching for new tokens in generate()
 
         # We only add to the prompt (first call), not the generated tokens.
-        ppos, apos = resid_pre.shape[1], act_diff.shape[1]
+        ppos, apos = resid_pre.shape[1], act_add.shape[1]
         assert apos <= ppos, f"More mod tokens ({apos}) then prompt tokens ({ppos})!"
 
         # TODO: Make this a function-wrapper for flexibility.
-        resid_pre[:, :apos, :] += act_diff
+        resid_pre[:, :apos, :] += act_add
         return resid_pre
 
     return _hook
