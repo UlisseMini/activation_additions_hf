@@ -77,11 +77,7 @@ def test_transformerlens_huggingface_same(models):
 # %%
 
 def test_ave_same(models):
-        # Ave settings
     model, tokenizer = models
-    prompt_add, prompt_sub = 'Love ', 'Hate'
-    act_name = 6
-    prompt = "I hate you because"
 
     # Tokenize
     prompt_tokens = ave.tokenize(tokenizer, [prompt])
