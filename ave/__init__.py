@@ -8,15 +8,21 @@ import torch.nn as nn
 
 # %%
 
-def tokenize(tokenizer, prompt: List[str], prepend_bos=True, device='cpu'):
-    "Helper function to prepend <BOS>, tokenize, and move to device."
+def tokenize(tokenizer, prompts: List[str], prepend_bos=True, pad_token_id=None, device='cpu'):
+    """
+    Helper function to prepend <BOS>, tokenize, pad, and move to device.
+    The padding used is the first of the following that is available:
+        pad_token_id, tokenizer.pad_token_id, tokenizer.encode(' ')[0]
+    """
     # Prepending BOS to GPT2 is fine even though it wasn't trained with it is fine and intentional
     # https://github.com/neelnanda-io/TransformerLens/issues/282#issuecomment-1555972480
-    assert isinstance(prompt, list), "Prompt must be a List[str]"
+    assert isinstance(prompts, list), "Prompt must be a List[str]"
     if prepend_bos:
-        prompt = [tokenizer.bos_token + p for p in prompt]
+        prompts = [tokenizer.bos_token + p for p in prompts]
 
-    inputs = tokenizer(prompt, return_tensors='pt')
+    tokenizer.pad_token_id = pad_token_id or tokenizer.pad_token_id or tokenizer.encode(' ')[0]
+
+    inputs = tokenizer(prompts, return_tensors='pt', padding=True)
     inputs = {k: t.to(device) for k, t in inputs.items()}
     return inputs
 
@@ -76,11 +82,9 @@ def residual_stream(model: nn.Module, layers: Optional[List[int]] = None):
         yield stream
 
 
-def pad(tokenizer, prompts: List[str], pad_token: str = ' '):
-    "Pad prompts with spaces at the end to have the same number of tokens"
-    assert len(tokenizer.tokenize(pad_token)) == 1, "Padding token must be a single token"
-    max_len = max(len(tokenizer.tokenize(p)) for p in prompts)
-    return [p + pad_token * (max_len - len(tokenizer.tokenize(p))) for p in prompts]
+def _device(model):
+    "Get the device of the first parameter of the model. Assumes all parameters are on the same device."
+    return next(model.parameters()).device
 
 
 def get_diff_vector(model: nn.Module, tokenizer, prompt_add: str, prompt_sub: str, layer: int):
@@ -88,7 +92,7 @@ def get_diff_vector(model: nn.Module, tokenizer, prompt_add: str, prompt_sub: st
     Get the difference vector between the activations of prompt_add and prompt_sub at the specified layer. 
     """
     with residual_stream(model, layers=[layer]) as stream:
-        _ = model(**tokenize(tokenizer, [prompt_add, prompt_sub]))
+        _ = model(**tokenize(tokenizer, [prompt_add, prompt_sub], device=_device(model)))
 
     return (stream[layer][0] - stream[layer][1]).unsqueeze(0)
 
