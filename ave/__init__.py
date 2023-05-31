@@ -104,7 +104,7 @@ def get_hook_fn(act_diff: t.Tensor) -> PreHookFn:
 
     def _hook(_: nn.Module, inputs: Tuple[t.Tensor]):
         resid_pre, = inputs
-        if resid_pre.shape[1] == 0:
+        if resid_pre.shape[1] == 1:
             return None # caching for new tokens in generate()
 
         # We only add to the prompt (first call), not the generated tokens.
