@@ -47,10 +47,14 @@ def get_x_vector(
     custom_pad_id: Optional[int] = None,
 ) -> List[ActivationAddition]:
     assert hasattr(model, 'tokenizer'), "Model must have a model.tokenizer"
-    if pad_method is not None:
-        raise NotImplementedError("pad_method is not implemented")
+    if pad_method is not None and pad_method != "tokens_right":
+        raise NotImplementedError('pad_method != "tokens_right" is not implemented')
     
-    act = ave.get_vectors(model, model.tokenizer, [prompt1, prompt2], layer=act_name)
+    if custom_pad_id is not None:
+        model.tokenizer.pad_token_id = custom_pad_id
+
+    act = ave.get_vectors(model, model.tokenizer, [prompt1, prompt2], act_name)
+
     return [
         ActivationAddition(prompt=prompt1, coeff=coeff, layer=act_name, act=act[0].unsqueeze(0)),
         ActivationAddition(prompt=prompt2, coeff=-coeff, layer=act_name, act=act[1].unsqueeze(0)),
@@ -61,8 +65,8 @@ def get_x_vector(
 
 def port_sampling_kwargs(sampling_kwargs: Dict[str, float]) -> Dict[str, float]:
     if 'freq_penalty' in sampling_kwargs:
-        # FIXME: Pretty sure repetition penalty is a different algorithm, only conceptually similar.
-        sampling_kwargs['repetition_penalty'] = sampling_kwargs['freq_penalty']
+        # FIXME: Repetition penalty is a different algorithm, only conceptually similar.
+        sampling_kwargs['repetition_penalty'] = 1.2 * sampling_kwargs['freq_penalty']
         del sampling_kwargs['freq_penalty']
 
     # FIXME: Seed in the right place to get same outputs as original repo
@@ -72,7 +76,7 @@ def port_sampling_kwargs(sampling_kwargs: Dict[str, float]) -> Dict[str, float]:
         del sampling_kwargs['seed']
 
     if 'tokens_to_generate' in sampling_kwargs:
-        sampling_kwargs['max_length'] = sampling_kwargs['tokens_to_generate']
+        sampling_kwargs['max_new_tokens'] = sampling_kwargs['tokens_to_generate']
         del sampling_kwargs['tokens_to_generate']
 
     # argmax is default, need to switch to sampling
@@ -89,7 +93,7 @@ def get_n_comparisons(prompts: List[str], model: Model, additions: List[Activati
     """
     assert hasattr(model, 'tokenizer'), "Model must have a model.tokenizer"
     def _to_df(tokens: t.Tensor, modified: bool):
-        completions = [tokenizer.decode(t.tolist(), skip_special_tokens=True) for t in tokens]
+        completions = [model.tokenizer.decode(t.tolist(), skip_special_tokens=True) for t in tokens]
         trimmed = [c[len(p):] for p, c in zip(prompts, completions)]
 
         return pd.DataFrame({
@@ -100,7 +104,7 @@ def get_n_comparisons(prompts: List[str], model: Model, additions: List[Activati
 
     sampling_kwargs = port_sampling_kwargs(sampling_kwargs)
 
-    inputs = ave.tokenize(tokenizer, prompts, device=ave._device(model))
+    inputs = ave.tokenize(model.tokenizer, prompts, device=ave._device(model))
 
     # Generate unmodified completions
     # FIXME: "Setting `pad_token_id` to `eos_token_id`:50256 for open-end generation." should not happen. tokenizer has a set token?
@@ -257,15 +261,14 @@ if __name__ == '__main__':
     sampling_kwargs: Dict[str, Union[float, int]] = {
         "temperature": 1.0,
         "top_p": 0.3,
-        # "freq_penalty": 1.0, # original, works terrible. repetition_penalty must require higher settings
-        "freq_penalty": 2.0,
+        "freq_penalty": 1.0,
         "num_comparisons": 3,
         "tokens_to_generate": 50,
         "seed": 0,  # For reproducibility
     }
     get_x_vector_preset: Callable = partial(
         get_x_vector,
-        # pad_method="tokens_right",
+        pad_method="tokens_right",
         model=model,
         custom_pad_id=int(tokenizer.encode(" ")[0]),
     )
@@ -286,3 +289,5 @@ if __name__ == '__main__':
         **sampling_kwargs,
     )
 
+
+# %%
