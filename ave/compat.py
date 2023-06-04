@@ -10,6 +10,7 @@ import pandas as pd
 from dataclasses import dataclass
 import prettytable
 import numpy as np
+from transformers import LogitsProcessor
 
 
 # %%
@@ -63,10 +64,25 @@ def get_x_vector(
 
 # %%
 
+
+class FrequencyPenaltyLogitsProcessor(LogitsProcessor):
+    def __init__(self, frequency_penalty: float):
+        self.frequency_penalty = frequency_penalty
+
+    def __call__(self, current_tokens: t.LongTensor, scores: t.FloatTensor) -> t.FloatTensor:
+        for batch_index in range(scores.shape[0]):
+            scores[batch_index] = scores[batch_index] - self.frequency_penalty * t.bincount(
+                current_tokens[batch_index], minlength=scores.shape[-1]
+            )
+        return scores
+
+
 def port_sampling_kwargs(sampling_kwargs: Dict[str, float]) -> Dict[str, float]:
+    logit_processors = []
+
     if 'freq_penalty' in sampling_kwargs:
-        # FIXME: Repetition penalty is a different algorithm, only conceptually similar.
-        sampling_kwargs['repetition_penalty'] = 1.2 * sampling_kwargs['freq_penalty']
+        logit_processors.append(FrequencyPenaltyLogitsProcessor(sampling_kwargs['freq_penalty']))
+
         del sampling_kwargs['freq_penalty']
 
     # FIXME: Seed in the right place to get same outputs as original repo
@@ -81,7 +97,7 @@ def port_sampling_kwargs(sampling_kwargs: Dict[str, float]) -> Dict[str, float]:
 
     # argmax is default, need to switch to sampling
     sampling_kwargs['do_sample'] = True
-
+    sampling_kwargs['logits_processor'] = logit_processors
     
     return sampling_kwargs
 
@@ -289,5 +305,3 @@ if __name__ == '__main__':
         **sampling_kwargs,
     )
 
-
-# %%
