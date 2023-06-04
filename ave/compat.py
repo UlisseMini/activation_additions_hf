@@ -85,10 +85,8 @@ def port_sampling_kwargs(sampling_kwargs: Dict[str, float]) -> Dict[str, float]:
 
         del sampling_kwargs['freq_penalty']
 
-    # FIXME: Seed in the right place to get same outputs as original repo
     if 'seed' in sampling_kwargs:
         t.manual_seed(sampling_kwargs['seed'])
-        np.random.seed(sampling_kwargs['seed'])
         del sampling_kwargs['seed']
 
     if 'tokens_to_generate' in sampling_kwargs:
@@ -118,13 +116,11 @@ def get_n_comparisons(prompts: List[str], model: Model, additions: List[Activati
             'is_modified': modified,
         })
 
-    sampling_kwargs = port_sampling_kwargs(sampling_kwargs)
-
     inputs = ave.tokenize(model.tokenizer, prompts, device=ave._device(model))
 
     # Generate unmodified completions
     # FIXME: "Setting `pad_token_id` to `eos_token_id`:50256 for open-end generation." should not happen. tokenizer has a set token?
-    nom_tokens = model.generate(**inputs, **sampling_kwargs)
+    nom_tokens = model.generate(**inputs, **port_sampling_kwargs(sampling_kwargs))
 
     # Generate modified completions
     blocks = ave.get_blocks(model)
