@@ -4,7 +4,7 @@
 from typing import Callable, Dict, Optional, Tuple, Union, Any, List
 from functools import partial
 import torch as t
-import ave
+import activation_additions
 import pandas as pd
 from dataclasses import dataclass
 import prettytable
@@ -53,7 +53,7 @@ def get_x_vector(
     if custom_pad_id is not None:
         model.tokenizer.pad_token_id = custom_pad_id
 
-    act = ave.get_vectors(model, model.tokenizer, [prompt1, prompt2], act_name)
+    act = activation_additions.get_vectors(model, model.tokenizer, [prompt1, prompt2], act_name)
 
     return [
         ActivationAddition(prompt=prompt1, coeff=coeff, layer=act_name, act=act[0].unsqueeze(0)),
@@ -116,16 +116,16 @@ def get_n_comparisons(prompts: List[str], model: Model, additions: List[Activati
             'is_modified': modified,
         })
 
-    inputs = ave.tokenize(model.tokenizer, prompts, device=ave._device(model))
+    inputs = activation_additions.tokenize(model.tokenizer, prompts, device=activation_additions._device(model))
 
     # Generate unmodified completions
     # FIXME: "Setting `pad_token_id` to `eos_token_id`:50256 for open-end generation." should not happen. tokenizer has a set token?
     nom_tokens = model.generate(**inputs, **port_sampling_kwargs(sampling_kwargs))
 
     # Generate modified completions
-    blocks = ave.get_blocks(model)
-    hooks = [(blocks[a.layer], ave.get_hook_fn(a.coeff*a.act)) for a in additions]
-    with ave.pre_hooks(hooks):
+    blocks = activation_additions.get_blocks(model)
+    hooks = [(blocks[a.layer], activation_additions.get_hook_fn(a.coeff*a.act)) for a in additions]
+    with activation_additions.pre_hooks(hooks):
         mod_tokens = model.generate(**inputs, **port_sampling_kwargs(sampling_kwargs))
     
     nom_df, mod_df = _to_df(nom_tokens, modified=False), _to_df(mod_tokens, modified=True)
