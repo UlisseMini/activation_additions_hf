@@ -64,8 +64,7 @@ def test_transformerlens_huggingface_same(models):
     prompt = "I hate you because"
     prompt_tokens = ave.tokenize(tokenizer, [prompt])
     labels = prompt_tokens['input_ids']
-    with ave.residual_stream(model) as stream:
-        outputs = model(**prompt_tokens, labels=labels)
+    outputs = model(**prompt_tokens, labels=labels)
 
     # See cell above to compute
     loss_target = t.tensor(4.819790363311768)
