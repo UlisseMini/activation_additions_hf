@@ -1,6 +1,5 @@
-# Compatibility layer for algebraic_value_editing, such that notebooks can be ran without changes.
-
 # %%
+# Compatibility layer for algebraic_value_editing, such that notebooks can be ran without changes.
 
 from typing import Callable, Dict, Optional, Tuple, Union, Any, List
 from functools import partial
@@ -78,6 +77,7 @@ class FrequencyPenaltyLogitsProcessor(LogitsProcessor):
 
 
 def port_sampling_kwargs(sampling_kwargs: Dict[str, float]) -> Dict[str, float]:
+    sampling_kwargs = sampling_kwargs.copy()
     logit_processors = []
 
     if 'freq_penalty' in sampling_kwargs:
@@ -126,7 +126,7 @@ def get_n_comparisons(prompts: List[str], model: Model, additions: List[Activati
     blocks = ave.get_blocks(model)
     hooks = [(blocks[a.layer], ave.get_hook_fn(a.coeff*a.act)) for a in additions]
     with ave.pre_hooks(hooks):
-        mod_tokens = model.generate(**inputs, **sampling_kwargs)
+        mod_tokens = model.generate(**inputs, **port_sampling_kwargs(sampling_kwargs))
     
     nom_df, mod_df = _to_df(nom_tokens, modified=False), _to_df(mod_tokens, modified=True)
     return pd.concat([nom_df, mod_df], ignore_index=True)
@@ -266,6 +266,11 @@ if __name__ == '__main__':
     tokenizer = AutoTokenizer.from_pretrained('gpt2-xl')
     setattr(model, 'tokenizer', tokenizer) # bit cursed but w/e
 
+    from transformer_lens import HookedTransformer
+    hooked_model = HookedTransformer.from_pretrained('gpt2-xl')
+
+
+
 # %%
 # Example usage (dev)
 
@@ -301,3 +306,64 @@ if __name__ == '__main__':
         **sampling_kwargs,
     )
 
+
+# %%
+
+# with ave.residual_stream(model, layers=[48]) as stream:
+#     res = model.generate(**ave.tokenize(model.tokenizer, ["I hate you because"]), **port_sampling_kwargs({
+#         "temperature": 1.0,
+#         "top_p": 0.3,
+#         "freq_penalty": 1.0,
+#         "max_new_tokens": 50,
+#         "seed": 0,
+#     }))
+
+# print(model.tokenizer.decode(res[0]))
+
+# # %%
+
+# len(stream)
+
+# # %%
+
+# model.config['n_layer']
+
+# # %%
+
+# res = model(**ave.tokenize(model.tokenizer, ["I hate you because you"]))
+# logits = res[0]
+
+
+# logits[0][-1][t.tensor(tokenizer.encode(["'re", "are"]))]
+
+# # %%
+
+# t.log_softmax(logits, -1)[0, -1][t.tensor(tokenizer.encode(["'re", "are"]))]
+
+
+# # %%
+# # Test generate is the same
+
+# if __name__ == '__main__':
+#     kwargs = {
+#         "temperature": 1.0,
+#         # "top_p": 0.3,
+#         # "freq_penalty": 1.0,
+#         "max_new_tokens": 10,
+#     }
+
+#     prompt = ""
+
+#     print('-' * 30 + ' HuggingFace ' + '-' * 30)
+#     t.manual_seed(0); np.random.seed(0)
+#     res = model.generate(**ave.tokenize(model.tokenizer, [prompt]), **port_sampling_kwargs(kwargs))
+#     print(model.tokenizer.decode(res[0]))
+
+#     print('-' * 30 + ' TransformerLens ' + '-' * 30)
+#     t.manual_seed(0); np.random.seed(0)
+#     res = hooked_model.generate(hooked_model.to_tokens(prompt), verbose=False, **kwargs)
+#     print(hooked_model.to_string(res)[0])
+
+# # %%
+
+# model.config['pdrop']
