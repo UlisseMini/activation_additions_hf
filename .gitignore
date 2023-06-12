@@ -1,5 +1,7 @@
 # Downloaded models (like LLAMA)
 models
+# Ran notebooks for sharing
+*.html
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
