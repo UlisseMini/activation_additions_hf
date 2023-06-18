@@ -18,6 +18,7 @@ def tokenize(tokenizer, prompts: List[str], prepend_bos=True, pad_token_id=None,
     # https://github.com/neelnanda-io/TransformerLens/issues/282#issuecomment-1555972480
     assert isinstance(prompts, list), "Prompt must be a List[str]"
     if prepend_bos:
+        # FIXME: Check that prepend bos is not enabled for this tokenizer (llama tokenizer already prepends bos.)
         prompts = [tokenizer.bos_token + p for p in prompts]
 
     tokenizer.pad_token_id = pad_token_id or tokenizer.pad_token_id or tokenizer.encode(' ')[0]
