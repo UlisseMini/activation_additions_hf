@@ -116,7 +116,8 @@ def get_n_comparisons(prompts: List[str], model: Model, additions: List[Activati
             'is_modified': modified,
         })
 
-    inputs = activation_additions.tokenize(model.tokenizer, prompts, device=activation_additions._device(model))
+    inputs, device = model.tokenizer(prompts, return_tensors='pt', padding=True), activation_additions._device(model)
+    inputs = {k: v.to(device) for k, v in inputs.items()}
 
     # Generate unmodified completions
     # FIXME: "Setting `pad_token_id` to `eos_token_id`:50256 for open-end generation." should not happen. tokenizer has a set token?
