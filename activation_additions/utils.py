@@ -3,37 +3,77 @@
 from ipywidgets import HTML
 from IPython.display import display
 from typing import List
+from functools import cache as run_once
+
+
+@run_once
+def inject_tooltip_style():
+    "Inject CSS for tooltips."
+
+    tooltip_style = """
+    <style>
+    [data-tooltip]:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        background-color: #555;
+        color: #fff;
+        padding: 5px;
+        border-radius: 5px;
+        z-index: 1;
+    }
+    </style>
+    """
+    display(HTML(tooltip_style))
+
 
 # Similar to https://alan-cooney.github.io/CircuitsVis/?path=/docs/tokens-coloredtokens--code-example
 # But written from scratch for flexibility, speed, and to avoid dependencies.
-def colored_tokens(tokens: List[str], colors: List[float]):
+def colored_tokens(tokens: List[str], raw_colors: List[float], tooltips: List[str] = None):
     """
     Args:
         tokens: List of tokens to color. Generally obtained from tokenizer.
-        colors: List of floats between 0 and 1, one for each token. Typically probabilities.
+        raw_colors: List of floats for coloring. Later normalized to [0, 1].
     """
-    assert len(tokens) == len(colors)
-    for token, color in zip(tokens, colors):
-        assert 0 <= color <= 1, f'color {color} for {token} is not between 0 and 1'
+    assert len(tokens) == len(raw_colors)
+    if tooltips is None:
+        tooltips = [f'{c:.2f}' for c in raw_colors]
+
+    # Normalize colors linearly
+    colors = [c - min(raw_colors) for c in raw_colors]
+    colors = [c / max(colors) for c in colors]
 
     # TODO: More sophisticated color contrasting scheme
-    # TODO: Javascript hovering
+    inject_tooltip_style()
     return ''.join([
-        f'<span style="color: rgb({255*(1-c)}, {255*c}, 0);">{s}</span>'
-        for s, c in zip(tokens, colors)
+        f'<span data-tooltip="{t}" style="color: rgb({255*(1-c)}, {255*c}, 0);">{s}</span>'
+        for s, c, t in zip(tokens, colors, tooltips)
     ])
 
 
+
 # %%
-# Test it
 
 if __name__ == '__main__':
-    from transformers import GPT2Tokenizer
+    from transformers import AutoTokenizer, AutoModelForCausalLM
     import torch
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    tokenizer = AutoTokenizer.from_pretrained('gpt2')
+    model = AutoModelForCausalLM.from_pretrained('gpt2')
 
+# %%
+
+if __name__ == '__main__':
     prompt = "I like to eat cheese and crackers"
     tokens = tokenizer.batch_decode([[t] for t in tokenizer.encode(prompt)])[1:]
-    losses = torch.softmax(torch.tensor([-22.31, -20., -5., -2., -10., -2., -4.]), -1)
+    # tokens = [t.replace(' ', '_') for t in tokens]
 
-    display(HTML(f'<p>{colored_tokens(tokens, losses)}</p>'))
+    inputs = tokenizer(prompt, return_tensors='pt')
+    output = model(**inputs)
+
+    logprobs = torch.log_softmax(output.logits, -1)
+    token_logprobs = logprobs[..., :-1, :].gather(-1, inputs['input_ids'][..., 1:, None])[0, ..., 0]
+    token_probs = torch.exp(token_logprobs)
+
+    tokens_html = colored_tokens(tokens, token_logprobs.tolist(), tooltips=[f'{p:.4f}' for p in token_probs.tolist()])
+    display(HTML(f'<p>{tokens_html}</p>'))
+
+# %%
