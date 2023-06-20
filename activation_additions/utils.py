@@ -28,19 +28,21 @@ def inject_tooltip_style():
 
 # Similar to https://alan-cooney.github.io/CircuitsVis/?path=/docs/tokens-coloredtokens--code-example
 # But written from scratch for flexibility, speed, and to avoid dependencies.
-def colored_tokens(tokens: List[str], raw_colors: List[float], tooltips: List[str] = None):
+def colored_tokens(tokens: List[str], raw_colors: List[float], tooltips: List[str] = None, high=None, low=None):
     """
     Args:
         tokens: List of tokens to color. Generally obtained from tokenizer.
         raw_colors: List of floats for coloring. Later normalized to [0, 1].
+        high: Maximum value for color normalization. Defaults to max(raw_colors).
+        low: Minimum value for color normalization. Defaults to min(raw_colors).
     """
     assert len(tokens) == len(raw_colors)
     if tooltips is None:
         tooltips = [f'{c:.2f}' for c in raw_colors]
 
     # Normalize colors linearly
-    colors = [c - min(raw_colors) for c in raw_colors]
-    colors = [c / max(colors) for c in colors]
+    high, low = high or max(raw_colors), low or min(raw_colors)
+    colors = [(c - low) / (high - low) for c in raw_colors]
 
     # TODO: More sophisticated color contrasting scheme
     inject_tooltip_style()
@@ -73,7 +75,12 @@ if __name__ == '__main__':
     token_logprobs = logprobs[..., :-1, :].gather(-1, inputs['input_ids'][..., 1:, None])[0, ..., 0]
     token_probs = torch.exp(token_logprobs)
 
-    tokens_html = colored_tokens(tokens, token_logprobs.tolist(), tooltips=[f'{p:.4f}' for p in token_probs.tolist()])
+    tokens_html = colored_tokens(
+        tokens,
+        token_logprobs.tolist(),
+        tooltips=[f'{p:.4f}' for p in token_probs.tolist()],
+        high=1, low=0,
+    )
     display(HTML(f'<p>{tokens_html}</p>'))
 
 # %%
