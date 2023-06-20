@@ -3,10 +3,8 @@
 from ipywidgets import HTML
 from IPython.display import display
 from typing import List
-from functools import cache as run_once
 
 
-@run_once
 def inject_tooltip_style():
     "Inject CSS for tooltips."
 
