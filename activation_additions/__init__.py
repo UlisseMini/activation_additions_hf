@@ -6,28 +6,6 @@ import torch as t
 import torch.nn as nn
 
 
-# %%
-
-def tokenize(tokenizer, prompts: List[str], prepend_bos=True, pad_token_id=None, device='cpu'):
-    """
-    Helper function to prepend <BOS>, tokenize, pad, and move to device.
-    The padding used is the first of the following that is available:
-        pad_token_id, tokenizer.pad_token_id, tokenizer.encode(' ')[0]
-    """
-    # Prepending BOS to GPT2 is fine even though it wasn't trained with it is fine and intentional
-    # https://github.com/neelnanda-io/TransformerLens/issues/282#issuecomment-1555972480
-    assert isinstance(prompts, list), "Prompt must be a List[str]"
-    if prepend_bos:
-        # FIXME: Check that prepend bos is not enabled for this tokenizer (llama tokenizer already prepends bos.)
-        prompts = [tokenizer.bos_token + p for p in prompts]
-
-    tokenizer.pad_token_id = pad_token_id or tokenizer.pad_token_id or tokenizer.encode(' ')[0]
-
-    inputs = tokenizer(prompts, return_tensors='pt', padding=True)
-    inputs = {k: t.to(device) for k, t in inputs.items()}
-    return inputs
-
-
 # types
 PreHookFn = Callable[[nn.Module, t.Tensor], Optional[t.Tensor]]
 Hook = Tuple[nn.Module, PreHookFn]
@@ -93,7 +71,10 @@ def get_vectors(model: nn.Module, tokenizer, prompts: List[str], layer: int):
     Get the activations of the prompts at the specified layer. Used later for activation additions.
     """
     with residual_stream(model, layers=[layer]) as stream:
-        _ = model(**tokenize(tokenizer, prompts, device=_device(model)))
+        inputs = tokenizer(prompts, return_tensors='pt', padding=True)
+        device = _device(model)
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        _ = model(**inputs)
 
     return stream[layer]
 

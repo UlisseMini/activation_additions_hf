@@ -23,7 +23,7 @@ from algebraic_value_editing import hook_utils, prompt_utils, lenses
 hooked_model = HookedTransformer.from_pretrained('gpt2-xl')
 hooked_model.eval()
 
-# uses default TransformerLens tokenization, which matches `aa.tokenize`
+# uses default TransformerLens tokenization
 vanilla_loss = hooked_model(prompt, return_type='loss')
 print(f'vanilla loss {vanilla_loss.item()}')
 
@@ -44,6 +44,8 @@ def fixture_models():
     model_path, device = 'gpt2-xl', 'cpu'
 
     tokenizer = AutoTokenizer.from_pretrained(model_path)
+    # tokenizer.pad_token_id = tokenizer.encode(' ')[0] # what original technique uses
+    tokenizer.pad_token_id = tokenizer.eos_token_id # transformerlens default
     model = AutoModelForCausalLM.from_pretrained(model_path)
     model.to(device); model.eval()
 
@@ -62,7 +64,7 @@ def test_transformerlens_huggingface_same(models):
     # Test that model logits are the same.
     # TODO: Batch of prompts
     prompt = "I hate you because"
-    prompt_tokens = aa.tokenize(tokenizer, [prompt])
+    prompt_tokens = tokenizer([tokenizer.bos_token + prompt], return_tensors='pt')
     labels = prompt_tokens['input_ids']
     outputs = model(**prompt_tokens, labels=labels)
 
@@ -79,11 +81,11 @@ def test_aa_same(models):
     model, tokenizer = models
 
     # Tokenize
-    prompt_tokens = aa.tokenize(tokenizer, [prompt])
+    prompt_tokens = tokenizer([tokenizer.bos_token + prompt], return_tensors='pt')
     labels = prompt_tokens['input_ids']
 
     # Get the difference vector, stream and outputs
-    act_diff = coeff * aa.get_diff_vector(model, tokenizer, prompt_add, prompt_sub, act_name)
+    act_diff = coeff * aa.get_diff_vector(model, tokenizer, tokenizer.bos_token + prompt_add, tokenizer.bos_token + prompt_sub, act_name)
     hook_fn = aa.get_hook_fn(act_diff)
     layer = aa.get_blocks(model)[act_name]
     with aa.pre_hooks([(layer, hook_fn)]):
