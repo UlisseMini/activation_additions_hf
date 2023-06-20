@@ -12,7 +12,9 @@ def inject_tooltip_style():
     <style>
     [data-tooltip]:hover::after {
         content: attr(data-tooltip);
+        white-space: pre-wrap;
         position: absolute;
+        line-height: 1.2;
         background-color: #555;
         color: #fff;
         padding: 5px;
@@ -56,13 +58,13 @@ def colored_tokens(tokens: List[str], raw_colors: List[float], tooltips: List[st
 if __name__ == '__main__':
     from transformers import AutoTokenizer, AutoModelForCausalLM
     import torch
-    tokenizer = AutoTokenizer.from_pretrained('gpt2')
-    model = AutoModelForCausalLM.from_pretrained('gpt2')
+    tokenizer = AutoTokenizer.from_pretrained('gpt2-xl')
+    model = AutoModelForCausalLM.from_pretrained('gpt2-xl')
 
 # %%
 
 if __name__ == '__main__':
-    prompt = "I like to eat cheese and crackers"
+    prompt = tokenizer.bos_token + "I like to eat cheese and crackers"
     tokens = tokenizer.batch_decode([[t] for t in tokenizer.encode(prompt)])[1:]
     # tokens = [t.replace(' ', '_') for t in tokens]
 
@@ -70,13 +72,26 @@ if __name__ == '__main__':
     output = model(**inputs)
 
     logprobs = torch.log_softmax(output.logits, -1)
+    print(logprobs.shape, inputs['input_ids'].shape)
+
+    # Experimental topk view. Probably want nested html instead of content() tooltips.
+    k = 5
+    topk = torch.topk(logprobs[0], k, dim=-1)
+    topk_strs = [
+        ' '.join([
+            f'{tokenizer.decode(topk.indices.tolist()[t][i])}({topk.values[t][i].exp():.2f})'
+            for i in range(k)
+        ])
+        for t in range(logprobs.shape[1])
+    ]
+
     token_logprobs = logprobs[..., :-1, :].gather(-1, inputs['input_ids'][..., 1:, None])[0, ..., 0]
     token_probs = torch.exp(token_logprobs)
 
     tokens_html = colored_tokens(
         tokens,
         token_logprobs.tolist(),
-        tooltips=[f'{p:.4f}' for p in token_probs.tolist()],
+        tooltips=[f'prob: {p:.4f}\nTopk: {topk_str}' for p, topk_str in zip(token_probs.tolist(), topk_strs)],
         high=1, low=0,
     )
     display(HTML(f'<p>{tokens_html}</p>'))
