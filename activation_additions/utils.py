@@ -3,6 +3,7 @@
 from ipywidgets import HTML
 from IPython.display import display
 from typing import List
+from html import escape
 
 
 tooltip_style = """
@@ -34,7 +35,7 @@ def colored_tokens(tokens: List[str], raw_colors: List[float], tooltips: List[st
         high: Maximum value for color normalization. Defaults to max(raw_colors).
         low: Minimum value for color normalization. Defaults to min(raw_colors).
     """
-    assert len(tokens) == len(raw_colors)
+    assert len(tokens) == len(raw_colors), f'len(tokens) ({len(tokens)}) != len(raw_colors) ({len(raw_colors)})'
     if tooltips is None:
         tooltips = [f'{c:.2f}' for c in raw_colors]
 
@@ -46,7 +47,7 @@ def colored_tokens(tokens: List[str], raw_colors: List[float], tooltips: List[st
     return (tooltip_style if inject_css else '') + ''.join([
         f'''
         <span class="token" style="color: rgb({255*(1-c)}, {255*c}, 0);">
-            {s}
+            {escape(s)}
             <span class="hover">{t}</span>
         </span>
         '''.strip()
